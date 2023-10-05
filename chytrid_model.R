@@ -63,7 +63,7 @@ chytrid.ode.model <- function (t, x, params) {
 # Rate parameters, given in Table S3
 parameters <- c(beta = 0.006, # initial guess, to fit
                 alpha = 0.3, # initial guess, to fit
-                omega = 1/120,
+                omega = 1/120, # initial guess, to fit
                 gamma1 = 1.0/2.5, 
                 gamma2 = 1.0/4.5, 
                 h_int = 100,
