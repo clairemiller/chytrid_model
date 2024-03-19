@@ -9,6 +9,10 @@ library(purrr) # For map2
 library(ggplot2)
 library(tidyr)
 
+# Path to raw data
+raw_data_filepath <- "data/rawdata.csv"
+processed_data_filepath <- "./expdata.csv"
+
 # Read in the data, we expect a dataset with the following columns
 #   - Mesocosm: the mesocosm ID
 #   - shaded: true/false whether the mesocosm was shaded or unshaded
@@ -17,7 +21,7 @@ library(tidyr)
 #   - vaccinated: true/false whether the frog was vaccinated at week 0
 #   - infected: true/false whether the frog was infected at week 0
 #   - inf_level: the recorded infection level at this observation
-rawdata <- read.csv("data/rawdata.csv", check.names = F) %>%
+rawdata <- read.csv(raw_data_filepath, check.names = F) %>%
   select(Mesocosm, shaded, week, frog_id,
          vaccinated, infected, inf_level) %>%
   # Remove any frogs with missing infection levels (assumed dead)
@@ -74,12 +78,6 @@ output_permesocosm <- output_perfrog %>%
   summarise(N=n(),.groups="drop") %>%
   arrange(Mesocosm,week)
 
-# Output both datasets to CSV
-write.csv(x=output_permesocosm,file="data/expdata_compartments.csv",
+# Output dataset to CSV
+write.csv(x=output_permesocosm,file=processed_data_filepath,
           quote=F, row.names=F)
-
-output_perfrog %>%
-  arrange(Mesocosm,frog_id,week) %>%
-  relocate(frog_id,.after=shaded) %>%
-  write.csv(x=.,file="data/expdata_perfrog.csv",quote=F,row.names=F)
-

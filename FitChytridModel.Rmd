@@ -1,14 +1,20 @@
 ---
-title: "Chytrid Model"
-author: "Dr Claire Miller, Prof. Jennifer Flegg, Dr Patricia Campbell"
-date: "25/09/2023"
-output: 
-  html_document
+title: "Modelling results for manuscript: 'Hotspot shelters enable frogs to survive chytridiomycosis and stimulate resistance'"
+author: "Claire Miller, Jennifer Flegg, Patricia Campbell"
+date: "Feb. 2024"
+output: html_document
+editor_options: 
+  markdown: 
+    wrap: sentence
 ---
 
-This document runs the ODE parameter fitting for the article: Anthony W. Waddle et al., 'Heated homes for hoppers: Hotspot shelters enable frogs to survive chytridiomycosis and stimulate resistance'.
-
 ```{r setup, include=FALSE}
+# Data and model filepaths
+expdata_filename <- "expdata.csv"
+source("chytrid_models_and_residuals.R")
+source("plotting_functions.R")
+
+# Libraries
 knitr::opts_chunk$set(echo = F, warning = F)
 library(dplyr)
 library(tidyr)
@@ -19,21 +25,64 @@ library(minpack.lm) # For the fitting
 library(deSolve)
 library(tibble)
 
-# Data and model filepaths
-compartmental_filename <- "data/expdata_compartments.csv"
-perfrog_filename <- "data/expdata_perfrog.csv"
-source("chytrid_model.R")
-
-# Set the ggplot theme
+# Change the ggplot theme
 theme_set(theme_bw(base_size = 12))
 options(ggplot2.discrete.colour = brewer.pal(7, "Dark2"), ggplot2.discrete.fill = brewer.pal(7, "Dark2"))
 ```
 
-## Experimental data
 
-The data is from from `r compartmental_filename` and `r perfrog_filename`, which 
-are generated using the `process_frog_compartments.R` script.
-There are 8 Mesocosms, 4 shaded and 4 unshaded.
+This RMarkdown report contains all the modelling results for the manuscript: Waddle et al. (2024) "Hotspot shelters enable frogs to survive chytridiomycosis and stimulate resistance".
+The report is divided into the following sections, associated tables and figures from the manuscript are indicated in the parentheses:
+
+1. [Model equations](#model-equations)
+2. [Experimental data](#exp-data)
+3. [Parameter fitting](#model-fitting) (Table 1)
+4. [Fit comparison to data](#model-validation) (Figure S6)
+5. [Sensitivity of fitting](#sensitivity) (Figure S7)
+6. [Truncated normal fit](#truncated-normal) (Figure S8)
+7. [Stochastic trajectories](#stochastic-trajectories) (Figure S9)
+
+## Model equations <a name="model-equations"></a>
+
+The model equations are: $$\begin{aligned}
+  \frac{dS}{dt}   &= -\frac{\lambda S}{(N-1)} - \mu S \\
+  \frac{dI_1}{dt}  &= \frac{\lambda S}{(N-1)} - (\gamma_1+\mu) I_1 \\
+  \frac{dI_2}{dt}  &= \gamma_1 I_1 - (\gamma_2+\mu) I_2 \\
+  \frac{dI_3}{dt}  &= \gamma_2 I_2 - (\omega+\mu) I_3 \\
+  \frac{dS_V}{dt}  &= -\alpha \frac{\lambda S_V}{(N-1)} + \omega I_{V3} + \omega I_3 - \mu S_V \\
+  \frac{dI_{V1}}{dt} &= \alpha \frac{\lambda S_V}{(N-1)} - (\gamma_1+\mu) I_{V1} \\
+  \frac{dI_{V2}}{dt} &= \gamma_1 I_{V1} - (\gamma_2+\mu) I_{V2} \\
+  \frac{dI_{V3}}{dt} &= \gamma_2 I_{V2} - (\omega+\mu) I_{V3} \\
+  \frac{dN}{dt} &= -\mu N
+\end{aligned}$$
+where
+$$
+\lambda = \beta(m_{int}I_1+h_{int}I_2+I_3 + m_{int,V}I_{V1}+h_{int,V}I_{V2}+l_{int,V}I_{V3})
+$$
+
+for: $S$ the number of susceptible frogs; $I_1$, $I_2$, and $I_3$ are the number of infected frogs in the first, second, and third stages of infection, respectively; $S_V$ the number of vaccinated susceptible frogs; $I_{V1}$, $I_{V2}$, and $I_{V3}$ the number of vaccinated frogs in the first, second, and third stages of infection, respectively, and the total number of frogs $N$.
+
+## Experimental data <a name="exp-data"></a>
+
+```{r read-exp-data}
+# Read in the two experimental datasets
+# per-compartment timeseries, and per-frog data
+# We expect the per-compartment data to have the following columns:
+#   - Mesocosm: the mesocosm ID
+#   - shaded: true/false whether the mesocosm was shaded or unshaded
+#   - week: the observation week
+#   - compartment: the compartment label
+#   - N: the number of frogs cross all compartments
+expdata <- read.csv(expdata_filename,check.names=F) %>%
+  mutate(Mesocosm=as.factor(Mesocosm)) %>%
+  pivot_wider(names_from=compartment,values_from=N) %>%
+  mutate(across(-c(Mesocosm,shaded,week),~ifelse(is.na(.x),0,.x))) %>%
+  rowwise() %>%
+  mutate(N = sum(c_across(-c(Mesocosm,shaded,week)))) %>%
+  ungroup()
+```
+
+The data is from from `r expdata_filename`, which was processed from the raw data using the `process_frog_compartments.R` script.
 We assume at T=0 there were 5 frogs in each of the following categories:
 
 - infect.+vacc. (IV1)
@@ -43,99 +92,38 @@ We assume at T=0 there were 5 frogs in each of the following categories:
 
 and all other compartments had 0 frogs.
 
-```{r read-data, fig.width = 5, fig.height = 3}
-# Read in the two experimental datasets
-# per-compartment timeseries, and per-frog data
-# We expect the per-compartment data to have the following columns:
-#   - Mesocosm: the mesocosm ID
-#   - shaded: true/false whether the mesocosm was shaded or unshaded
-#   - week: the observation week
-#   - compartment: the compartment label
-#   - N: the number of frogs
-percompartment <- read.csv(compartmental_filename,check.names=F) %>%
-  mutate(Mesocosm=as.factor(Mesocosm)) %>%
-  pivot_wider(names_from=compartment,values_from=N) %>%
-  mutate(across(-c(Mesocosm,shaded,week),~ifelse(is.na(.x),0,.x))) %>%
-  rowwise() %>%
-  mutate(N = sum(c_across(-c(Mesocosm,shaded,week)))) %>%
-  ungroup()
-# We expect the per-frog data to have the following columns:
-#   - Mesocosm: the mesocosm ID
-#   - shaded: true/false whether the mesocosm was shaded or unshaded
-#   - frog_id: the unique ID of the frog
-#   - week: the observation week
-#   - vaccinated: true/false whether the frog was vaccinated at week 0
-#   - inf_level: the recorded infection level at this observation
-#   - compartment_i: numeric of compartment (0-S/SV, 1-I1/IV1, 2-I2/IV2, 3-I3/IV3)
-#   - prev_infection: if the frog has been infected since week 0
-#   - compartment: current compartment label for the frog
-perfrog <- read.csv(perfrog_filename,check.names = F) %>% 
-  filter(!is.na(inf_level))
-# Vector of observation weeks
-weeks = sort(unique(perfrog$week))
-
-# Plot the number of frogs observed over time
-group_by(perfrog,Mesocosm,shaded,week) %>%
-  summarise(N=n(),.groups="drop") %>%
-ggplot(aes(x=week,y=N,colour=shaded,group=Mesocosm)) + 
-  geom_point() + geom_line() +
-  labs(y="No. frogs found") + 
-  scale_y_continuous(limits=c(0,20)) +
-  scale_x_continuous(limits=c(0,15),breaks = weeks, minor_breaks = NULL)
+The following parameters for the model were calculated directly from laboratory data (Table S3 in manuscript):
+```{r}
+# Print parameters, except beta, alpha, mu, and omega
+fixed_parms <- parameters[!(names(parameters) %in% c('mu','beta','alpha','omega'))]
+kable(t(fixed_parms), caption = "Fixed parameters")
 ```
 
-## Model
 
-We use the following model (Fig. S5, mortality not shown in diagram):
+## Parameter fitting <a name="model-fitting"></a>
 
-```{r model-diagram, out.width = "400px"}
-knitr::include_graphics("model_diagram_20230925.png")
-```
-
-We make the following assumptions on the parameters we are fitting in the model:
-
-1.  Frogs die from any compartment at a mortality rate $\mu$, which is invariant to compartment, vaccination, and environment
-2.  The effect of vaccination ($\alpha$) is invariant to environment 
-3. The recovery rate ($\omega$) is invariant to vaccination and environment
-3. The transmission rate ($\beta$) varies between environments.
-
-
-The model equations are: $$\begin{aligned}
-  \frac{dS}{dt}   &= -\beta S \frac{I}{(N-1)} - \mu S \\
-  \frac{dI_1}{dt}  &= \beta S \frac{I}{(N-1)} - (\gamma_1+\mu) I_1 \\
-  \frac{dI_2}{dt}  &= \gamma_1 I_1 - (\gamma_2+\mu) I_2 \\
-  \frac{dI_3}{dt}  &= \gamma_2 I_2 - (\omega+\mu) I_3 \\
-  \frac{dS_V}{dt}  &= -\alpha \beta S_V \frac{I}{(N-1)} + \omega I_{V3} + \omega I_3 - \mu S_V \\
-  \frac{dI_{V1}}{dt} &= \alpha \beta S_V \frac{I}{(N-1)} - (\gamma_1+\mu) I_{V1} \\
-  \frac{dI_{V2}}{dt} &= \gamma_1 I_{V1} - (\gamma_2+\mu) I_{V2} \\
-  \frac{dI_{V3}}{dt} &= \gamma_2 I_{V2} - (\omega+\mu) I_{V3} \\
-  \frac{dN}{dt} &= -\mu (S+I_1+I_2+I_3+S_V+I_{V1}+I_{V2}+I_{V3})
-\end{aligned}$$
-
-## Parameter fitting
+Parameter fitting was performed using the `minpack.lm` package. 
+Full details on the fitting methods are given in the manuscript.
 
 ```{r fit-params}
-# Original guesses
+# Original guesses are given in the model script
 unknown_params = list(
-  beta_shaded = parameters[["beta"]],
-  beta_greenhouse = parameters[["beta"]],
-  alpha=parameters[["alpha"]], 
+  beta_sh = parameters[["beta"]],
+  beta_un = parameters[["beta"]],
+  alpha = parameters[["alpha"]], 
   omega = parameters[["omega"]],
   mu = parameters[["mu"]]
 )
 
 # Fit model
-fit=nls.lm(par=unknown_params,lower=c(0,0,0,0,0),fn=calc_residuals,expdata=percompartment)
+fit=nls.lm(par=unknown_params,lower=c(0,0,0,0,0),
+           fn=calc_residuals,expdata=expdata)
 summfit <- summary(fit)
 fit_coefficients <- summfit$coefficients
-
-# Print full details of coefficient fits
-kable(fit_coefficients,caption="Estimated parameters",digits=3)
 ```
 
-Estimate and 95% CI (Table 1 in the article):
-
-```{r table-fits-CI}
+The fitted parameters Estimate and 95% CI (Table 1 in the article) are as follows:
+```{r table-1}
 full_join(
   rownames_to_column(data.frame(fit_coefficients), var="Parameter"),
   rownames_to_column(data.frame(confint(fit),check.names=F), var="Parameter"),
@@ -147,57 +135,111 @@ full_join(
   kable(digits=3)
 ```
 
-Plots comparing the fits to the experimental data (Fig. S6 in article):
 
-```{r plot-fits}
-# Get the parameters from the fit for plotting
-fit_params = summfit$coefficients[,"Estimate"]
-parameters["alpha"] = fit_params[["alpha"]]
-parameters["omega"] = fit_params[["omega"]]
-parameters["mu"] = fit_params["mu"]
+## Fit comparison to data <a name="model-validation"></a>
 
-# Function to plot the compartments against the solution
-lab_fn <- function(labels) {
-  gsub("(\\a)|(V*\\d)|(V)","\\1[\\2\\3]",labels)
-}
-plot_compartments <- function(parameters, env_shaded) {
-  prediction <- ode(
-        func=chytrid.ode.model,
-        y=x0,
-        times=seq(0,max(percompartment$week),length.out=100),
-        parms=parameters
-      ) %>% as_tibble() %>%
-        mutate(across(everything(),as.numeric)) %>%
-    pivot_longer(cols=-time) %>%
-    mutate(name=lab_fn(name)) %>%
-    filter(name != "N")
-  plot_title = ifelse(env_shaded,"Shaded","Unshaded")
-  plot_data <- percompartment %>% 
-    pivot_longer(cols=!c(Mesocosm,shaded,week)) %>%
-    filter(shaded == env_shaded) %>%
-    filter(name != "N") %>%
-    rename(time="week") %>%
-    mutate(name = lab_fn(name))
-  ggplot(plot_data, aes(x=time,y=value)) + 
-      geom_line(aes(group=Mesocosm),alpha=0.5) + 
-      geom_point(aes(group=Mesocosm,colour="Data"),alpha=0.7) +
-      geom_line(aes(colour="Prediction"),size=1,data=prediction) +
-      facet_wrap(~name, labeller="label_parsed") +
-      scale_colour_manual(values=c("black","#1B9E77")) +
-      labs(title=plot_title,x="Time (weeks)",y="Number of frogs",colour=NULL)+
-      theme(legend.position=c(0.85,0.15))
-}
+The following plots show the deterministic prediction, given the estimates above, against the experimental data (Figure S6 in manuscript).
 
-# Unshaded/Greenhouse
-parameters["beta"] = fit_params[["beta_greenhouse"]]
-plot_compartments(parameters,env_shaded=FALSE)
-# Shaded
-parameters["beta"] = fit_params[["beta_shaded"]]
-plot_compartments(parameters,env_shaded=TRUE)
+```{r shaded-comparison}
+# Shaded plots
+parms_shaded = c(fixed_parms,
+  fit_coefficients[rownames(fit_coefficients) != "beta_un","Estimate"])
+names(parms_shaded) = gsub("beta_sh","beta",names(parms_shaded))
+plot_compartments(list(parms_shaded), filter(expdata,shaded)) +
+  labs(title="Shaded")
 ```
 
-The two further values given in the article text:
+```{r unshaded-comparison}
+# Unshaded plots
+parms_unshaded = c(fixed_parms,
+  fit_coefficients[rownames(fit_coefficients) != "beta_sh","Estimate"])
+names(parms_unshaded) = gsub("beta_un","beta",names(parms_shaded))
+plot_compartments(list(parms_unshaded), filter(expdata,!shaded)) +
+  labs(title="Unshaded")
+```
 
--   the ratio of beta shaded:unshaded (greenhouse), $\frac{\beta_{SH}}{\beta_{UN}}$, which is: `r round(fit_coefficients["beta_shaded","Estimate"]/fit_coefficients["beta_greenhouse","Estimate"],digits=1)`.
 
--   The inverse of $\alpha$, which is: `r round(1/fit_coefficients["alpha","Estimate"],digits=4)`
+## Sensitivity analysis <a name="sensitivity"></a>
+
+We explore the sensitivity of the parameter fits to the data by leaving each mesocosm out in turn and refitting the model.
+The plot shows the estimates and 95% CI for each mesocosm removed (Figure S7 in manuscript). 
+
+```{r sensitivity-analysis}
+# Run for each mesocosm removed, 0: no mesocosms removed
+res.sa <- c() 
+for (mesocosm_i in c("None",levels(expdata$Mesocosm))) {
+  # Fit model
+  data_i <- filter(expdata, Mesocosm != mesocosm_i)
+  fit_i=nls.lm(par=unknown_params,
+             lower=c(0,0,0,0,0),
+             fn=calc_residuals,
+             expdata=data_i)
+  fit_coefficients_i <- summary(fit_i)$coefficients
+  
+  # Extract the estimate and 95% CI
+  parms_i <- full_join(
+    rownames_to_column(data.frame(fit_coefficients_i), var="Parameter"),
+    rownames_to_column(data.frame(confint(fit_i),check.names=F), var="Parameter"),
+    by="Parameter"
+    ) %>%
+    mutate(MesocosmRm = mesocosm_i)
+
+  # Append to results data frame
+  res.sa <- rbind(res.sa,
+                  select(parms_i, Parameter,Estimate,`2.5 %`,`97.5 %`,MesocosmRm))
+}
+```
+
+```{r sa-plot}
+# Process data for plotting
+res.sa$ParameterMath = gsub("(beta)_([a-z][a-z]).*","\\1[\\2]",res.sa$Parameter)
+res.sa$MesocosmRm = factor(res.sa$MesocosmRm, levels=c("None",levels(expdata$Mesocosm)))
+
+ggplot(res.sa,
+       aes(color=ParameterMath, x=MesocosmRm, y=Estimate, ymin=`2.5 %`, ymax=`97.5 %`)) +
+  geom_errorbar(position=position_dodge(width=0.5), size =  1) +
+  geom_point(position=position_dodge(width=0.5), size=3) +
+  labs(x="Mesocosm removed", y="Estimate") +
+  scale_color_discrete(name="Parameter", labels= function(x) parse(text = x))
+
+```
+
+## Truncated normal fit <a name="truncated-normal"></a>
+We compare the fits using a truncated normal distribution to the fit rather than a least squares. 
+The plot comparees 
+
+```{r trunc-normal-fit}
+# Run the fit
+fit <- optim(par = unknown_params, fn = calc_residuals_obsmodel, 
+             expdata = expdata, method = "SANN",
+             lower = rep(0.001,length(unknown_params)),
+             upper = c(rep(0.5,length(unknown_params)-1), 0.05))
+
+# Print the coefficients compared to the least squares fit
+data.frame(`Truncated Normal` = fit$par,
+            `Least squares (above)` = fit_coefficients[,"Estimate"],
+            check.names=F) %>%
+  kable(digits=3)
+```
+
+```{r trunc-normal-shaded}
+# Truncated normal fit shaded
+parms_shaded_tn = c(fixed_parms,
+  fit$par[names(fit$par) != "beta_sh"])
+names(parms_shaded_tn) = gsub("beta_un","beta",names(parms_shaded))
+plot_compartments(list(parms_shaded, parms_shaded_tn), 
+                  filter(expdata,shaded), 
+                  c("Least squares", "Truncated normal")) +
+  labs(title="Shaded")
+```
+
+## Stochastic trajectories <a name="stochastic-trajectories"></a>
+
+Example trajectories of the number of frogs are simulated using the estimated parameters and a Gillespie algorithm from the `GillespieSSA` library (Figure S9).
+
+```{r gillespie-trajectories}
+set.seed(141)
+plot_gillespie(parms_shaded) + labs(title="Shaded")
+plot_gillespie(parms_unshaded) + labs(title="Unshaded")
+```
+
