@@ -188,13 +188,36 @@ calc_residuals_obsmodel=function(par, expdata){
   return(negLL)
 }
 
-# 5. Function to run the Gillespie algorithm ---------------------------------
+# 5. Functions to run the Gillespie algorithm ---------------------------------
 # @param parms: a named vector of parameters
 # @param tf: total time
 # @param Nsims: number of simulations
 library(GillespieSSA)
 run_gillespie <- function(parms, tf = 15, Nsims = 10)
 {
+  # Get the reactions and stochiometric matrix using function below
+  gillespise_system <- build_system_gillespie()
+  
+  # Run the SSAs trajectories
+  #-------------------------------------------------------------------
+  # We don't explicitly model N so remove from initial conditions
+  x0.gillespie <- x0[names(x0) != "N"]
+  # Run Nsims trajectories using ssa direct Gillespie method
+  trajectories <- list()
+  for (i in 1:Nsims) {
+    trajectories[[i]] <- ssa(x0 = x0.gillespie,
+                             a = gillespise_system[["a"]],
+                             nu = gillespise_system[["nu"]],
+                             parms = parms, tf = tf, 
+                             method = ssa.d(),verbose = FALSE, consoleInterval = 1)
+  }
+  
+  # Return the trajectories
+  return(trajectories)
+}
+
+# Keep this as a separate function to minimise compute time
+build_system_gillespie <- function() {
   # Build the reactions and stochiometric matrix (state-change matrix) 
   #-------------------------------------------------------------------
   # where each colums is a posible reaction with associate propensity in a vector
@@ -251,20 +274,6 @@ run_gillespie <- function(parms, tf = 15, Nsims = 10)
   a[16] <- "mu*IV3"
   nu[c(8),16] <- c(-1)
   
-  
-  # Run the SSAs trajectories
-  #-------------------------------------------------------------------
-  # We don't explicitly model N so remove from initial conditions
-  x0.gillespie <- x0[names(x0) != "N"]
-  # Run Nsims trajectories using ssa direct Gillespie method
-  trajectories <- list()
-  for (i in 1:Nsims) {
-    trajectories[[i]] <- ssa(x0 = x0.gillespie,
-                             a = a,nu = nu,
-                             parms = parms, tf = tf, 
-                             method = ssa.d(),verbose = FALSE, consoleInterval = 1)
-  }
-  
-  # Return the trajectories
-  return(trajectories)
+  # Return as list
+  return(list("a"=a,"nu"=nu))
 }

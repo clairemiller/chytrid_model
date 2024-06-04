@@ -1,0 +1,13 @@
+##############################
+# My R singularity container
+# Build command: 
+#   singularity build -f /people/cmil633/Containers/chytrid_R_container.sif ~/ChytridABC/RSingularity.def
+##############################
+Bootstrap: docker
+From: r-base:4.3.1
+
+%post
+    Rscript -e "install.packages(c('magrittr','GillespieSSA','dplyr','tidyr','msm','foreach','doParallel','knitr'), repos='https://cran.rstudio.com')"
+
+%runscript
+    R

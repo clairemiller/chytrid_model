@@ -205,8 +205,7 @@ ggplot(res.sa,
 ```
 
 ## Truncated normal fit <a name="truncated-normal"></a>
-We compare the fits using a truncated normal distribution to the fit rather than a least squares. 
-The plot comparees 
+We compare the fits using a truncated normal distribution to the data rather than a least squares (Figure S8 in manuscrpt).
 
 ```{r trunc-normal-fit}
 # Run the fit
@@ -235,7 +234,7 @@ plot_compartments(list(parms_shaded, parms_shaded_tn),
 
 ## Stochastic trajectories <a name="stochastic-trajectories"></a>
 
-Example trajectories of the number of frogs are simulated using the estimated parameters and a Gillespie algorithm from the `GillespieSSA` library (Figure S9).
+Example trajectories of the number of frogs are simulated using the estimated parameters and a Gillespie algorithm from the `GillespieSSA` library (Figure S9 in manuscrpt).
 
 ```{r gillespie-trajectories}
 set.seed(141)
