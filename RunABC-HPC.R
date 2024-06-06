@@ -105,12 +105,12 @@ calcSummaryStatisticsOneEnv <- function(Xobs, Xsim) {
        # (xobsi[,names(xsimi)] ensures the same column order)
        sdiff <- mapply("-", xobsi[,names(xsimi)], xsimi)
        # Return the absolute values of the differences
-       return(abs(sdiff))
+       return((sdiff)^2)
      }) %>% 
      # Convert back to a data frame
      do.call(rbind, .)
   # Return the compartment sums / total number of observations
-  return(colSums(Xdiff) / nrow(Xobs))
+  return(sum(Xdiff))
 }
 
 calcSummaryStatisticsBothEnv <- function(Xobs, Xsim) {
