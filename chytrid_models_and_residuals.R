@@ -94,7 +94,14 @@ parameters <- c(beta = 0.006, # initial guess, to fit
 x0 <- c( S=5,  I1=5,  I2=0,  I3=0, 
          SV=5, IV1=5, IV2=0, IV3=0)
 x0["N"] = sum(x0)
-
+# Parameters determined using the LS method
+lsfitparams <- c(
+    beta_sh = 0.05,
+    beta_un = 0.02,
+    alpha = 0.177,
+    omega = 0.258,
+    mu = 0.029
+)
 
 # 3. Residuals function for least squares ------------------------------------
 # Calculates the residuals using the chytrid.ode.model function above
@@ -273,6 +280,46 @@ build_system_gillespie <- function() {
   # IV3 loss
   a[16] <- "mu*IV3"
   nu[c(8),16] <- c(-1)
+  
+  # Return as list
+  return(list("a"=a,"nu"=nu))
+}
+
+# Let's try using a simple SIS model instead
+# We weight the infectiousnes by the expected time in each compartment
+# (m_int * I1 + m_intv * IV1 + h_int * I2 + h_intv * IV2 + I3 + l_intv * IV3)
+build_sis_system_gillespie <- function() {
+  # Build the reactions and stochiometric matrix (state-change matrix) 
+  #-------------------------------------------------------------------
+  # where each colums is a posible reaction with associate propensity in a vector
+  # Matrix rows: S, I, SV, IV
+  # we have 8 reactions and 4 states: 1=S, 2=I, 3=SV, 4=IV
+  a  <- rep(NA,8) # reactions
+  nu <- matrix(0,  nrow=4, ncol = 8,byrow=TRUE) # stochiometric matrix
+  # S->I
+  a[1] <- "beta*S*(I + 0.1*IV)/(S+I+SV+IV-1)"
+  nu[c(1,2),1] <- c(-1,1)
+  # S loss
+  a[2] <- "mu*S"
+  nu[c(1),2] <- c(-1)
+  # I->SV
+  a[3] <- "omega*I"
+  nu[c(2,3),3] <- c(-1,1)
+  # I loss
+  a[4] <- "mu*I"
+  nu[c(2),4] <- c(-1)
+  # SV->IV
+  a[5] <- "alpha*beta*SV*(I + 0.1*IV)/(S+I+SV+IV-1)"
+  nu[c(3,4),5] <- c(-1,1)
+  # SV loss
+  a[6] <- "mu*SV"
+  nu[c(3),6] <- c(-1)
+  # IV->SV
+  a[7] <- "omega*IV"
+  nu[c(3,4),7] <- c(1,-1)
+  # IV loss
+  a[8] <- "mu*IV"
+  nu[c(4),8] <- c(-1)
   
   # Return as list
   return(list("a"=a,"nu"=nu))

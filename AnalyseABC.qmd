@@ -13,6 +13,9 @@ library(magrittr)
 library(dplyr)
 library(tidyr)
 library(msm) # For truncated normal distribution
+library(MASS) # To estimate distribution values
+library(foreach)
+library(doParallel)
 ```
 
 ## Data load
@@ -20,19 +23,33 @@ library(msm) # For truncated normal distribution
 We have pre-run the data on HPC, as detailed in `RunABC.qmd`. We load this, and the experimental data for comparison.
 
 ```{r dataload}
-load("data/ABCSummaryStatistic-1e5samples.RData")
+load("data/ABCSummaryStatistic-1e3samples.RData")
 obs.long <- read.csv("data/expdata.csv")
+obs.wide <- rename(obs.long,"t"="week") %>%
+    pivot_wider(names_from="compartment", values_from="N", values_fill = 0)
 ```
 
 ## Summary statistic
 
-We have pre-calculated our summary statistic for each compartment: sum of the difference in number of frogs over all time points:
+We have pre-calculated our summary statistic for each compartment: sum of the square error
 
 $$
-S_i=\sum_j \sum_k \frac{|x_{ik,obs}(t_j)-x_{i,sim}(t_j|\theta)|}{N_{obs}}
+S_i=\sum_j \sum_k \left(x_{ik,obs}(t_j)-x_{i,sim}(t_j|\theta)\right)^2
 $$
 
-for compartment $x_i$ in observed data $X_{obs}$ (for each experiment $k$) and simulated data $X_{sim}$ for proposed parameter set $\theta$ at time $t_j$ over all observation time points $T = \{1,2,4,6,8,10,15\}$ weeks for $N_{obs}$ observations (7 time points x 4 experiments = 28).
+for compartment $x_i$ in observed data $X_{obs}$ (for each experiment $k$, 4 total) and simulated data $X_{sim}$ for proposed parameter set $\theta$ at time $t_j$ over all observation time points ($T = \{1,2,4,6,8,10,15\}$ weeks).
+
+### Error per compartment
+
+Let's have a look at the error in each compartment to see what we can predict well and what we can't predict well:
+
+```{r error-distr}
+pivot_longer(Si,-iteration) %>%
+  ggplot(aes(x=value)) +
+  geom_histogram() +
+  facet_wrap(~name, scales="free") +
+  scale_y_log10()
+```
 
 ## Acceptance criteria
 
@@ -45,11 +62,16 @@ If we apply some threshold to all compartments we get:
 #| warning: false
 acceptedP <- list()
 acceptanceRate <- list()
-for (threshold in seq(2,4,0.5)) {
-  acceptance = sapply(SList, function(Si) all(Si < threshold))
-  acceptedP[[as.character(threshold)]] <- 
-                              bind_rows(parametersets[acceptance])
+lognormalFit <- list()
+state_cols = names(Si)[names(Si) != "iteration"]
+for (threshold in seq(1400,2000,200)) {
+  acceptance <- apply(Si, 1, function(si) 
+                                  all( si[state_cols] < threshold) )
+  acceptedP[[as.character(threshold)]] <- parametersets[acceptance,]
   acceptanceRate[[as.character(threshold)]] = 100*mean(acceptance)
+  if (sum(acceptance) > 0 ) {
+    lognormalFit[[as.character(threshold)]] = apply(parametersets[acceptance,],2,fitdistr,densfun="lognormal")
+  }
 }
 acceptedP <- bind_rows(acceptedP, .id="threshold")
 # Print acceptance rate
@@ -65,16 +87,20 @@ pivot_longer(acceptedP, cols=-threshold) %>%
   geom_histogram(aes(fill=threshold, colour=threshold), alpha=0.2, bins=50) + 
   facet_grid(threshold~name, scales="free") +
   geom_histogram(data=prior, bins=50)
+
+# Print the fit estimates
+lapply(lognormalFit, function(f) sapply(f,"[[","estimate")) %>%
+  lapply(kable)
 ```
 
-Let's also look at a pair plot for this acceptance method (threshold of 3.5):
+Let's also look at a pair plot for this acceptance method (threshold of 5, taking the first 1000 samples only):
 
 ```{r}
 #| echo: false
 #| warning: false
 library(GGally)
-x <- acceptedP[acceptedP$threshold == 3.5,]
-ggpairs(x[,-1],
+x <- acceptedP[acceptedP$threshold == 1600,]
+ggpairs(x[1:1e3,-1],
         diag=list(continuous=wrap("barDiag",colour="black",fill="lightgrey")),
         lower = list(continuous=wrap("points",alpha=0.3,size=0.5)))
 ```
@@ -83,15 +109,15 @@ ggpairs(x[,-1],
 
 If we take the mean difference across all compartments and threshold on this we get:
 
-```{r}
+```{r mean-val}
 #| echo: false
 #| warning: false
 acceptedP <- list()
 acceptanceRate <- list()
-for (threshold in seq(1,2,0.25)) {
-  acceptance = sapply(SList, function(Si) all(mean(Si) < threshold))
-  acceptedP[[as.character(threshold)]] <- 
-                              bind_rows(parametersets[acceptance])
+state_cols = names(Si)[names(Si) != "iteration"]
+for (threshold in seq(400,500,20)) {
+  acceptance <- apply(Si, 1, function(si) all(mean(si[state_cols]) < threshold))
+  acceptedP[[as.character(threshold)]] <- parametersets[acceptance,]
   acceptanceRate[[as.character(threshold)]] = 100*mean(acceptance)
 }
 acceptedP <- bind_rows(acceptedP, .id="threshold")
@@ -119,10 +145,9 @@ Finally we can look at just I2/IV2:
 #| warning: false
 acceptedP <- list()
 acceptanceRate <- list()
-for (threshold in seq(1,3,0.5)) {
-  acceptance = sapply(SList, function(Si) (Si[["I2"]] <= threshold & Si[["IV2"]] <= threshold))
-  acceptedP[[as.character(threshold)]] <- 
-                              bind_rows(parametersets[acceptance])
+for (threshold in seq(400,500,20)) {
+  acceptance <- apply(Si, 1, function(si) (si[["I2"]] <= threshold & si[["IV2"]] <= threshold))
+  acceptedP[[as.character(threshold)]] <- parametersets[acceptance,]
   acceptanceRate[[as.character(threshold)]] = 100*mean(acceptance)
 }
 acceptedP <- bind_rows(acceptedP, .id="threshold")
