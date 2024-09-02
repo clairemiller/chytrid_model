@@ -52,6 +52,7 @@ runModel <- function(params.fit, Tvec)
   # Combine fitting parameters with other model parameters 
   # (These are defined in chytrid_models_and_residuals.R)
   parameters[names(params.fit)] = params.fit
+  parameters[["mu"]] = lsfitparams[["mu"]]
   # Run a trajectory
   trajectory <- ssa(x0 = x0,
       a = gillespie_system[["a"]],
@@ -141,12 +142,15 @@ calcSummaryStatisticsOneEnv <- function(Xobs, Xsim) {
        # Note mapply is much faster than data frame subtraction
        # (xobsi[,names(xsimi)] ensures the same column order)
        sdiff <- mapply("-", xobsi[,names(xsimi)], xsimi)
+       # Divide by the average number of frogs at this time point
+       avgFrogs <- colMeans(xobsi[names(xsimi)])+1
+       sdiff <- apply(sdiff,1,function(si){si/avgFrogs}) %>% t()
        # Return the absolute values of the differences
        return(abs(sdiff))
      }) %>% 
      # Convert back to a data frame
      do.call(rbind, .)
-  # Return the compartment sums / total number of observations
+  # Return the sum of the squares of each compartment
   return(colSums(Xdiff^2))
 }
 
@@ -185,11 +189,11 @@ We also need to choose how we choose our new parameter set. This requires us to 
 samplePrior <- function(nSamples)
 {
   proposed = lapply(1:nSamples, function(i) {
-    c(beta_sh = runif(1, min = 0, max = 1),
-      beta_un = runif(1, min = 0, max = 1),
-      alpha = rtnorm(1, mean = 1, sd = 1, lower = 0),
-      omega = runif(1, min = 0, max = 7),
-      mu = runif(1, min = 0, max = 1),
+    c(beta_sh = runif(1,min=0.05*0.9, max=0.05*2), #runif(1, min = 0, max = 1),
+      beta_un = runif(1,min=0.02*0.9,max=0.02*2), #runif(1, min = 0, max = 1),
+      alpha = runif(1,min=0.177*0.9,max=0.177*2), #rtnorm(1, mean = 1, sd = 1, lower = 0),
+      omega = 0.258, #runif(1,min=0.258*0.9,max=0.258*2),#runif(1, min = 0, max = 7),
+      #mu = runif(1, min = 0, max = 1),
       iteration = i)
   })
   return(proposed)
@@ -230,17 +234,6 @@ data.frame(as.list(summ.time)) %>%
   kable(caption=paste("Summary statistic computational time for",iterations,"iterations."))
 ```
 
-Error profile over all simulated data:
-
-```{r, errorhistogram}
-#| fig.width = 20
-pivot_longer(Si, cols=!iteration) %>%
-    mutate(name = factor(name, levels=compartments)) %>%
-      ggplot() + 
-      geom_histogram(aes(x=value)) +
-      facet_wrap(~name, scales="free_y", ncol=4)
-```
-
 ## Analysis
 
 ### Acceptance
@@ -264,12 +257,42 @@ actualp <- data.frame(name=names(lsfitparams),v=as.numeric(lsfitparams))
 pivot_longer(data.frame(accepted.sum),cols=!iteration) %>%
     ggplot(aes(x=value)) + geom_histogram() + facet_wrap(~name, scales="free") +
     geom_vline(aes(xintercept=v), colour="#ff5321", data=actualp) +
-    labs(title="Sum of error")
+    labs(title="Sum of squares error")
 
-pivot_longer(data.frame(accepted.max),cols=!iteration) %>%
-    ggplot(aes(x=value)) + geom_histogram() + facet_wrap(~name, scales="free")+
-    geom_vline(aes(xintercept=v), colour="#ff5321", data=actualp) +
-    labs(title="Maximum error")
+# pivot_longer(data.frame(accepted.max),cols=!iteration) %>%
+#     ggplot(aes(x=value)) + geom_histogram() + facet_wrap(~name, scales="free")+
+#     geom_vline(aes(xintercept=v), colour="#ff5321", data=actualp) +
+#     labs(title="Maximum square error across the different compartments")
+```
+
+```{r}
+dplyr::summarise(as.data.frame(accepted.sum),across(!iteration,~median(.x))) %>% knitr::kable(caption="median")
+
+dplyr::summarise(as.data.frame(accepted.sum),across(!iteration,~mean(.x))) %>% knitr::kable(caption="mean")
+```
+
+Error profile (squared error) over all simulated data, fill indicates error in accepted parameter sets.
+
+```{r, errorhistogram}
+#| fig.width = 20
+mutate(Si,
+      accepted = iteration %in% accepted.sum[,"iteration"]) %>%
+    pivot_longer(cols=!c(iteration,accepted)) %>%
+    mutate(name = factor(name, levels=compartments)) %>%
+      ggplot() + 
+      geom_histogram(aes(x=value,y=0.5*after_stat(density),fill=accepted),position=position_dodge()) +
+      facet_wrap(~name, scales="free", ncol=4) + 
+scale_fill_manual(values=c("darkblue","seagreen")) + labs(title="Condition: Sum of errors")
+
+
+mutate(Si,
+      accepted = iteration %in% accepted.max[,"iteration"]) %>%
+    pivot_longer(cols=!c(iteration,accepted)) %>%
+    mutate(name = factor(name, levels=compartments)) %>%
+      ggplot() + 
+     geom_histogram(aes(x=value,y=0.5*after_stat(density),fill=accepted),position=position_dodge()) +
+      facet_wrap(~name, scales="free", ncol=4) + 
+scale_fill_manual(values=c("darkblue","seagreen")) + labs(title="Condition: Maximum error")
 ```
 
 ### Spaghetti plots
@@ -277,7 +300,7 @@ pivot_longer(data.frame(accepted.max),cols=!iteration) %>%
 ```{r spaghettiplots}
 N_realisations = N_accepted
 # Convert data to long form and set correct compartment order
-r <- XsimList[order(max_error)[1:N_realisations]] %>% 
+r <- XsimList[order(sum_error)[1:N_realisations]] %>% 
         do.call(rbind,.) %>%
         pivot_longer(cols=!c(t,shaded,iteration)) %>%
         mutate(name = factor(name,levels=compartments), t = as.numeric(t))
@@ -291,32 +314,22 @@ ggplot(r,aes(x=t,y=value)) +
 
 ```
 
-We seem to not be capturing the original infection, presumably because the error of this can never be that big. What if we double the weight of the non-vaccinated compartments?
-
-```{r weightedplots}
-N_accepted = round(2.5*iterations/100)
+```{r acceptanceplots2}
+N_accepted = round(1*iterations/100)
 it_colid = which(names(Si)=="iteration")
+sum_error <- apply(Si[,-it_colid], 1, sum)
+max_error <- apply(Si[,-it_colid], 1, max)
 
-Si.2 <- mutate(Si, S = 2*S, I1=2*I1, I2=2*I2, I3=2*I3)
-max_error <- apply(Si.2[,-it_colid], 1, max)
+accepted.sum <- parametersets[order(sum_error)[1:N_accepted]]
 accepted.max <- parametersets[order(max_error)[1:N_accepted]]
+
+accepted.sum <- do.call(rbind,accepted.sum)
 accepted.max <- do.call(rbind,accepted.max)
 
 actualp <- data.frame(name=names(lsfitparams),v=as.numeric(lsfitparams))
-pivot_longer(data.frame(accepted.max),cols=!iteration) %>%
-    ggplot(aes(x=value)) + geom_histogram() + facet_wrap(~name, scales="free")+
+
+pivot_longer(data.frame(accepted.sum),cols=!iteration) %>%
+    ggplot(aes(x=value)) + geom_histogram() + facet_wrap(~name, scales="free") +
     geom_vline(aes(xintercept=v), colour="#ff5321", data=actualp) +
-    labs(title="Maximum error")
-
-N_realisations = N_accepted
-r <- XsimList[order(max_error)[1:N_realisations]] %>% 
-        do.call(rbind,.) %>%
-        pivot_longer(cols=!c(t,shaded,iteration)) %>%
-        mutate(name = factor(name,levels=compartments), t = as.numeric(t))
-obs.synth.long <- pivot_longer(obs.synth, cols=!c(runid, t, shaded)) %>%
-        mutate(name = factor(name,levels=compartments))
-
-ggplot(r,aes(x=t,y=value)) +
-    geom_line(aes(group=iteration,colour="simulated"), alpha = 0.1) + facet_grid(shaded~name) +
-    geom_line(aes(group=runid, colour="observed"), data=obs.synth.long)
+    labs(title="Sum of squares error")
 ```
