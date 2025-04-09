@@ -132,11 +132,11 @@ for (pkg in packages) {
 
 We have also included a Dockerfile to run this code using a Docker container without the requirement for R and library installation. For instructions on installing Docker, see: <https://www.docker.com/get-started/>.
 
-**Build the Docker Image:** The docker image must be built before containers can be run. This is done from the root directory of the project (the folder containing the Dockerfile).
+1.  **Build the Docker Image:** The docker image must be built before containers can be run (only needs to be done once). This is done from the root directory of the project (the folder containing the Dockerfile).
 
-``` bash
-docker build -t chytrid_model .
-```
+    ``` bash
+    docker build -t chytrid_model .
+    ```
 
 Scripts can be run individually through the containers as detailed above. Alternatively, the easiest way to generate the data and plots for each study is as follows:
 
