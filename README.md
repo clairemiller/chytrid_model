@@ -60,7 +60,7 @@ To reproduce the results and figures from the paper, follow these steps:
 
 1.  **Plot Experimental Data:**
 
-    ``` bash
+    ```bash
     Rscript plot_data.R 'exp'
     ```
 
@@ -68,15 +68,15 @@ To reproduce the results and figures from the paper, follow these steps:
 
     i.  Generate trajectories for all prior samples (saves data to `exp_priors_trajectories.RData`):
 
-        ``` bash
-        Rscript simulate_samples.R 'exp'
-        ```
+    ```bash
+    Rscript simulate_samples.R 'exp'
+    ```
 
     ii. Calculate summary statistics for all samples (saves data to `exp_summarystats.RData`):
 
-        ``` bash
-        Rscript calc_summary_stats.R 'exp'
-        ```
+    ```bash
+    Rscript calc_summary_stats.R 'exp'
+    ```
 
 3.  **Plot prior and posterior distributions (Figure 3(a)), posterior examples (Figure 3(b)), and extract Summary Statistics (Table 3) :**
 
