@@ -5,7 +5,7 @@
 *.html
 .positai
 sandbox/
-data/
+data/*/*
 documents/
 scripts/*/*
 *.log
