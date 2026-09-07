@@ -27,12 +27,13 @@ License: MIT + file LICENSE
 Encoding: UTF-8
 RoxygenNote: 7.3.2
 Imports:
-    dplyr,
-    ggplot2,
     GillespieSSA,
     scales,
-    tidyr,
-    devtools
+    devtools,
+    EasyABC,
+    Hmisc,
+    tidyverse,
+    GGally
 Depends: 
-    R (>= 3.5)
+    R (>= 4.5)
 LazyData: true
