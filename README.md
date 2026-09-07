@@ -28,8 +28,8 @@ The directory tree below details the files included in this repository and annot
 ├── chytrid-transmission-model.Rproj # R project file
 ├── DESCRIPTION # Description folder for devtools project setup
 ├── scripts
-│   ├── script_plot_posterior_examples.R # Plot the example trajectories given the posterior particle set
-│   ├── script_plot_posterior_distributions.R # Plot the posterior distributions
+│   ├── plot_posterior_examples.R # Plot the example trajectories given the posterior particle set
+│   ├── plot_posterior_distributions.R # Plot the posterior distributions
 │   ├── run_seq_abc.R # Run the estimation
 │   ├── generate_synthetic_data_ctmc.R # Generate the synthetic data for running the simulation estimation study
 │   ├── plot_data_trajectories.R # Plot the trajectories of the experimental and synthetic data (generated in generate_synthetic_data_ctmc)
