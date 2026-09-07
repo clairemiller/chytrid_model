@@ -1,0 +1,38 @@
+Package: chytrid-transmission-model
+Title: Code for sunlight-heated refugia mathematical modelling study
+Version: 0.0.1
+Authors@R:
+    person(
+        given = "Claire",
+        family = "Miller",
+        email = "claire.miller@auckland.ac.nz"
+    ),
+    person(
+        given = "Michael",
+        family = "Lydeamore",
+        email = "michael.lydeamore@monash.edu"
+    ),
+    person(
+        given = "Jennifer",
+        family = "Flegg",
+        email = "jennifer.flegg@unimelb.edu.au"
+    ),
+    person(
+        given = "Trish",
+        family = "Campbell",
+        email = "patricia.campbell@unimelb.edu.au"
+    )
+Description: Functions and analyses for the article "Sunlight-heated refugia protect frogs from chytridiomycosis: a mathematical modelling study".
+License: MIT + file LICENSE
+Encoding: UTF-8
+RoxygenNote: 7.3.2
+Imports:
+    dplyr,
+    ggplot2,
+    GillespieSSA,
+    scales,
+    tidyr,
+    devtools
+Depends: 
+    R (>= 3.5)
+LazyData: true

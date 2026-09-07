@@ -1,0 +1,14 @@
+.Rproj.user
+.Rhistory
+.RData
+.Ruserdata
+*.html
+.positai
+sandbox/
+data/
+documents/
+scripts/*/*
+*.log
+*.DS_Store
+*.pdf
+*.png
