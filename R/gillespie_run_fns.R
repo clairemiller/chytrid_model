@@ -7,7 +7,7 @@ library(GillespieSSA)
 run_gillespie <- function(parms, tf = 15, Nsims = 1)
 {
   # Get the reactions and stochiometric matrix using function below
-  gillespise_system <- build_stochastic_system()
+  gillespie_system <- build_stochastic_system()
   
   # Run the SSAs trajectories
   #-------------------------------------------------------------------
@@ -19,10 +19,10 @@ run_gillespie <- function(parms, tf = 15, Nsims = 1)
   trajectories <- list()
   for (i in 1:Nsims) {
     trajectories[[i]] <- ssa(x0 = x0.gillespie,
-                             a = gillespise_system[["a"]],
-                             nu = gillespise_system[["nu"]],
+                             a = gillespie_system[["a"]],
+                             nu = gillespie_system[["nu"]],
                              parms = parms, tf = tf, 
-                             method = ssa.d(),verbose = FALSE, consoleInterval = 1)
+                             method = ssa.d(), verbose = FALSE, consoleInterval = 1)
   }
   
   # Return the trajectories

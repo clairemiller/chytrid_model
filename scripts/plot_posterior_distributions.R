@@ -54,6 +54,7 @@ true_params_syn['alphabeta_un'] = true_params_syn['alpha']*true_params_syn['beta
 true_params_syn <- data.frame(parameter=names(true_params_syn), 
                           value=true_params_syn, row.names=NULL) %>%
   mutate(parameter = factor(parameter, levels = param_order))
+row.names(true_params_syn) = true_params_syn$parameter
 
 
 
@@ -63,15 +64,37 @@ summ_stats |>
   mutate(
     Prior = priors_text[parameter],
     parameter = format_labs(parameter, latex=T),
-    Mean = round(Mean,digits=3),
-    Median = round(Median,digits=3),
-    `95%crI`= paste0("(",round(p2.5,digits=3),",",round(p97.5,digits=3),")")) |>
+    Mean = round(Mean,digits=5),
+    Median = round(Median,digits=5),
+    `95%crI`= paste0("(",round(p2.5,digits=5),",",round(p97.5,digits=3),")")) |>
   select(parameter, Prior, Mean, Median, `95%crI`) |>
   mutate(across(everything(), ~ paste0(.x, " &"))) |> # Adds an & for LaTeX table formatting
   knitr::kable(format="simple",
     caption=paste0("Summary statistics for the posteriors (",lab,")"))
 
-
+# For the synthetic data, where do they sit within the posterior distribution?
+if (lab == "syn") {
+  ratio_posterior = iterN$beta_un/iterN$beta_sh
+  ratio_true = true_params_syn["beta_un","value"] / true_params_syn["beta_sh","value"]
+  cat("Relative difference between posterior mean and true value: \n")
+  for (i in 1:nrow(summ_stats)) {
+    parameter = as.character(summ_stats$parameter[i])
+    post_value = summ_stats$Median[i]
+    true_value = true_params_syn[parameter,"value"]
+    rel_diff = (post_value - true_value) / true_value
+    cat("  ", parameter, ":", rel_diff, "\n")
+  }
+  median_ratio = median(ratio_posterior)
+  rel_diff_ratio = (median_ratio - ratio_true) / ratio_true
+  cat("   beta_un/beta_sh:", rel_diff_ratio, "\n")
+  cat("Proportion of posterior samples less than true value (synthetic data): \n")
+  for (parameter in row.names(true_params_syn)) {
+    pct = mean(iterN[,parameter] < true_params_syn[parameter,"value"])
+    cat("  ", parameter, ":", pct, "\n")
+  }
+  pct = mean(ratio_posterior <= ratio_true)
+  cat("   beta_un/beta_sh:", pct, "\n") 
+}
 
 # Histogram of posteriors -------------------------------------------------
 nbins = 30
@@ -136,7 +159,7 @@ p_hist_log <-
 # Add true value if it's the synthetic data
 if (lab=="syn") {
   p_hist_log <- p_hist_log + 
-    geom_vline(aes(xintercept=value, linetype="true value"), linewidth = 1, 
+    geom_vline(aes(xintercept=value, linetype="True value"), linewidth = 1, 
                data=dplyr::filter(true_params_syn, parameter %in% names(priors))) +
     scale_linetype_manual(values = c(2,1))
 }

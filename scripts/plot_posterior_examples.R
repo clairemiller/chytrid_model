@@ -3,14 +3,14 @@ devtools::load_all(".")
 source("scripts/figure_formatting.R")
 
 # Load data - experimental
-lab = "exp"
-folder_name = file.path( "seq-abc_exp-results",
-    "easyABC_output-summ_stat_obs_plus_cum_new_inf-alpha0.4-n_particles50000" )
+# lab = "exp"
+# folder_name = file.path( "seq-abc_exp-results",
+#     "easyABC_output-summ_stat_obs_plus_cum_new_inf-alpha0.4-n_particles50000" )
 
 # Load data - synthetic
-# lab = "syn"
-# folder_name = file.path("seq-abc-syn-results",
-#                         "easyABC_output-summ_stat_obs_plus_cum_new_inf-alpha0.4-n_particles50000")
+lab = "syn"
+folder_name = file.path("seq-abc_syn-results",
+                        "easyABC_output-summ_stat_obs_plus_cum_new_inf-alpha0.4-n_particles50000")
 
 # Load the data
 load(file.path("data",folder_name,"abc_reduced_output.RData"))
@@ -38,10 +38,10 @@ params_to_plot <- posterior_df[random_particle_ids,]
 # Run Gillespie
 trajectories <- lapply(1:N, function(i) {
   p_new <- unlist(params_to_plot[i,])
-  parameters[names(p_new)] = p_new
-  p_shaded = parameters
+  p_shaded = base_params
+  p_shaded[names(p_new)] = p_new
   p_shaded[["beta"]] = p_shaded[["beta_sh"]]
-  p_unshaded = parameters
+  p_unshaded = p_shaded
   p_unshaded[["beta"]] = p_unshaded[["beta_un"]]
   traj_shaded = run_gillespie(p_shaded, Nsims=1)[[1]][["data"]] %>%
     as.data.frame()
@@ -93,9 +93,9 @@ p <- ggplot(traj_proc) +
   coord_cartesian(xlim = c(0, 15),expand = 0) +
   labs(x="Weeks", y="Num. frogs", colour=NULL) + 
   scale_colour_manual(values=c(env_pal,"black"),
-                      labels=c("Simulated","Simulated",
+                      labels=c("Simulated\n(shaded)","Simulated\n(unshaded)",
                                ifelse(lab=="exp","Experimental","Synthetic"))) +
-  guides(color = guide_legend(override.aes = list(alpha = 1, linewidth = 1, size=3) ) )
+  guides(color = guide_legend(override.aes = list(alpha = 1, linewidth = 1, size=3) ) ) 
 # Add experimental data
 p <- p + 
   geom_line(aes(x=week,y=N,group=Mesocosm, colour="X"), 
@@ -105,9 +105,11 @@ p <- p +
 print(p)
 
 
-
 # Save to pdf -------------------------------------------------------------
-pdf(file=paste0(fig_filename,".pdf"), width=11, height=6)
-  print(p + custom_theme)
+pdf(file=paste0(fig_filename,".pdf"), width=12, height=6)
+  print(
+    p + custom_theme + 
+    theme(panel.spacing.x = unit(1.5, "lines"), panel.spacing.y = unit(1.5, "lines"))
+    )
 dev.off()
 
