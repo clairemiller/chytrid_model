@@ -1,23 +1,27 @@
 # Libraries and data load ---------------------------------------------------------------
 devtools::load_all(".")
-source("scripts/figure_formatting.R")
+FIGURE_DIR = ifelse(basename(getwd()) == "scripts", "../figures", "figures")
+DATA_DIR = ifelse(basename(getwd()) == "scripts", "../data", "data")
 
-# Load data - experimental
-# lab = "exp"
-# folder_name = file.path( "seq-abc_exp-results",
-#     "easyABC_output-summ_stat_obs_plus_cum_new_inf-alpha0.4-n_particles50000" )
+# Choose the dataset to use
+lab = "syn" # synthetic
+# lab = "exp" # experimental
+args <- commandArgs(trailingOnly = TRUE)
+if (length(args) > 0) {
+  lab = args[1]
+  stopifnot(lab %in% c("syn","exp"))
+}
 
-# Load data - synthetic
-lab = "syn"
-folder_name = file.path("seq-abc_syn-results",
-                        "easyABC_output-summ_stat_obs_plus_cum_new_inf-alpha0.4-n_particles50000")
+# Folder name (based on the lab and the ABC settings)
+folder_name <- file.path( paste0( "seq-abc_", lab, "-results"),
+                          "easyABC_output-summ_stat_obs_plus_cum_new_inf-alpha0.4-n_particles50000")
+cat("Using folder: ", folder_name, "\n")
 
 # Load the data
-load(file.path("data",folder_name,"abc_reduced_output.RData"))
+load(file.path(DATA_DIR, folder_name, "abc_reduced_output.RData"))
 
 # Output file names
-fig_filename = paste0("figures/",lab,"_trajectories")
-
+fig_filename = file.path(FIGURE_DIR, paste0(lab,"_trajectories"))
 
 
 # Select samples and simulate ----------------------------------------------------------

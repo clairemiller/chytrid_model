@@ -2,26 +2,31 @@
 library(Hmisc)
 library(tidyverse)
 devtools::load_all(".")
-source("scripts/figure_formatting.R")
+FIGURE_DIR = ifelse(basename(getwd()) == "scripts", "../figures", "figures")
+DATA_DIR = ifelse(basename(getwd()) == "scripts", "../data", "data")
 
-# Load data - experimental
-# lab = "exp"
-# folder_name = file.path( "seq-abc_exp-results",
-#     "easyABC_output-summ_stat_obs_plus_cum_new_inf-alpha0.4-n_particles50000" )
+# Choose the dataset to use
+lab = "syn" # synthetic
+# lab = "exp" # experimental
+args <- commandArgs(trailingOnly = TRUE)
+if (length(args) > 0) {
+  lab = args[1]
+  stopifnot(lab %in% c("syn","exp"))
+}
 
-# Load data - synthetic
-lab = "syn"
-folder_name = file.path("seq-abc_syn-results",
-                        "easyABC_output-summ_stat_obs_plus_cum_new_inf-alpha0.4-n_particles50000")
+# Folder name (based on the lab and the ABC settings)
+folder_name <- file.path( paste0( "seq-abc_", lab, "-results"),
+                          "easyABC_output-summ_stat_obs_plus_cum_new_inf-alpha0.4-n_particles50000")
+cat("Using folder: ", folder_name, "\n")
 
 
 # Output file names
-output_filename_log = paste0("figures/",lab,"_distributions_logscale")
-output_filename_distributions = paste0("figures/",lab,"_distributions")
-output_filename_pairs = paste0("figures/",lab,"_pairs-plot")
+output_filename_log = file.path(FIGURE_DIR, paste0(lab,"_distributions_logscale"))
+output_filename_distributions = file.path(FIGURE_DIR, paste0(lab,"_distributions"))
+output_filename_pairs = file.path(FIGURE_DIR, paste0(lab,"_pairs-plot"))
 
 # Pre-process -------------------------------------------------------------------
-load(file.path("data",folder_name,"abc_reduced_output.RData"))
+load(file.path(DATA_DIR,folder_name,"abc_reduced_output.RData"))
 
 # Print the number of iterations
 cat("Number of iterations: ", length(iterations_data), "\n")
@@ -59,16 +64,18 @@ row.names(true_params_syn) = true_params_syn$parameter
 
 
 # Table of summary statistics ---------------------------------------------
-priors_text <- sapply(priors, function(x) paste0("$U(",x[2],",",x[3],")$"))
+# priors_text <- sapply(priors, function(x) paste0("$U(",x[2],",",x[3],")$")) # For latex formatting
+priors_text <- sapply(priors, function(x) paste0("U(",x[2],",",x[3],")")) # For simple formatting
 summ_stats |>
   mutate(
     Prior = priors_text[parameter],
-    parameter = format_labs(parameter, latex=T),
+    parameter = format_labs(parameter),
+    # parameter = format_labs(parameter, latex=T), # For latex formatting
     Mean = round(Mean,digits=5),
     Median = round(Median,digits=5),
     `95%crI`= paste0("(",round(p2.5,digits=5),",",round(p97.5,digits=3),")")) |>
   select(parameter, Prior, Mean, Median, `95%crI`) |>
-  mutate(across(everything(), ~ paste0(.x, " &"))) |> # Adds an & for LaTeX table formatting
+  # mutate(across(everything(), ~ paste0(.x, " &"))) |> # Adds an & for LaTeX table formatting
   knitr::kable(format="simple",
     caption=paste0("Summary statistics for the posteriors (",lab,")"))
 

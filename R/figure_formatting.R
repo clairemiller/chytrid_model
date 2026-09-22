@@ -23,7 +23,7 @@ param_order <- c("beta_sh", "beta_un", "alpha",
 compartment_order <- c("S" ,"I1",  "I2",  "I3",  
                        "SV",  "IV1", "IV2", "IV3")
 
-# Fix S/I1-I3 to be SU/IU1-3
+# Fix S/I1-I3 to be SN/IN1-3 and SV/IV... to SP/IP...
 fix_compartment_labels <- function(X) {
   mapping <- c("S"="S[N]",  "I1"="I[N*','*1]",  "I2"="I[N*','*2]",   "I3"="I[N*','*3]",
                "SV"="S[P]", "IV1"="I[P*','*1]", "IV2"= "I[P*','*2]", "IV3"="I[P*','*3]",
@@ -36,8 +36,9 @@ labeller_compartments = as_labeller(fix_compartment_labels, default = label_pars
 # Format parameter labelling
 format_labs <- function(value, latex = F) {
   if (latex) {
-    #lab <- gsub("(alpha|beta|omega)", "\\\\\\1", value)
-    lab <- paste0("$",value,"$")
+    lab <- paste0("$\\",value,"$")
+    lab <- gsub("(beta)_(sh|un)", "\\1_{\\2}", lab)
+    lab <- gsub("(alpha)(beta)", "alpha \\\\beta", lab)
   } else {
     lab <- gsub("(beta)_(sh|un)", "\\1[\\2]", value)
     lab <- gsub("(alpha)(beta)", "\\1*\\2", lab)

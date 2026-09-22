@@ -1,6 +1,6 @@
 # Load functions
 devtools::load_all(".")
-source("scripts/figure_formatting.R")
+FIGURE_DIR = ifelse(basename(getwd()) == "scripts", "../figures", "figures")
 
 # Function for plotting ---------------------------------------------------
 plot_trajectories <- function(df) {
@@ -20,7 +20,7 @@ plot_trajectories <- function(df) {
 }
 
 # Experimental ------------------------------------------------------------
-exp_fig_filename <- "figures/exp_data.pdf"
+exp_fig_filename <- file.path(FIGURE_DIR, "exp_data.pdf")
 
 # Plot the trajectories
 exp_p <- plot_trajectories(expdata)
@@ -33,7 +33,7 @@ dev.off()
 
 
 # Synthetic ---------------------------------------------------------------
-syn_fig_filename <- "figures/syn_data.pdf"
+syn_fig_filename <- file.path(FIGURE_DIR, "syn_data.pdf")
 
 # Plot the trajectories
 syn_p <- plot_trajectories(syndata)
