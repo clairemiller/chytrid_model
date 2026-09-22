@@ -1,12 +1,13 @@
 # Paper
 
-This repository contains the data and code required to reproduce the results for the paper: 'Sunlight-heated refugia protect frogs from chytridiomycosis: a mathematical modelling study', https://doi.org/10.48550/arXiv.2503.06846. 
+This repository contains the data and code required to reproduce the results for the paper: 'Estimating the impact of prior infection and sunlight-heated refugia on chytridiomycosis in frogs: a mathematical modelling study'. 
 
 ## Abstract
 
 The fungal disease chytridiomycosis has driven over 90 amphibian species to extinction, and severely affected hundreds more. Difficulties in disease management have shown a need for novel conservation approaches.
-We present a novel mathematical model for chytridiomycosis transmission in frogs, that includes the natural history of infection, to test the hypothesis that sunlight-heated refugia reduce transmission. The model is fit using approximate Bayesian computation to previous experimental data where a cohort of frogs, a subset of which had cleared a prior infection, were provided access to either sunlight-heated or shaded refugia. Using our model, we estimate the extent to which prior chytridiomycosis infection protects against subsequent infection and quantify the effect of sunlight-heating of refugia.
-Results estimate a 46% reduction in infection due to sunlight-heating of refugia, supporting the hypothesis that the sunlight-heated refugia reduce disease transmission. Frogs that were infected and recovered had an estimated reduction in susceptibility of 73% compared to frogs with no prior infection. 
+We present a novel mathematical model for chytridiomycosis transmission in frogs, that includes the natural history of infection, to test the hypothesis that sunlight-heated refugia reduce transmission. The model is fit using approximate Bayesian computation to previous experimental data where a cohort of frogs with varying pre-existing exposure to infection were provided access to either sunlight-heated or shaded refugia. Using our model, we estimate the extent to which prior chytridiomycosis infection protects against subsequent infection and quantify the effect of sunlight-heating of refugia.
+Results estimate a 46\% (95\% CrI (-125\%, 87\%)) reduction in infection due to sunlight-heating of refugia.
+While our estimates suggest substantial impacts of sunlight-heated refugia on disease transmission, more data is required to resolve uncertainties. Frogs that were infected and recovered had an estimated reduction in susceptibility of 73\% (95\% CrI (27\%, 94\%)) compared to frogs with no prior infection. 
 This study contributes to the evidence base for the use of sunlight-heated refugia as part of conservation strategies, and demonstrates the use of mathematical modelling to inform the implementation of habitat-based interventions for amphibian population recovery and sustainability.
 
 # Running the model
@@ -19,7 +20,9 @@ The structure and files in this repository are as follows:
 - The `data` directory contains the processed experimental, and is where all estimation results are stored.
 - The `figures` directory is where any generated figures are saved.
 
-To switch between synthetic and experimental results adjust the appropriate commented sections (`lab`and `folder_name`) or boolean (`synthetic_study`) at the beginning of the relevant file.
+To switch between synthetic and experimental:
+- In `run_seq_abc.R` set the boolean flag `synthetic_study` at the beginning of the file 
+- In `plot_posterior_distributions.R`and `plot_posterior_examples.R` add 'syn' or 'exp' as a command line argument when running the script, or adjust the appropriate commented default for `lab` at the beginning of the relevant file.
 
 The directory tree below details the files included in this repository and annotates their use. 
 
@@ -33,13 +36,13 @@ The directory tree below details the files included in this repository and annot
 │   ├── run_seq_abc.R # Run the estimation
 │   ├── generate_synthetic_data_ctmc.R # Generate the synthetic data for running the simulation estimation study
 │   ├── plot_data_trajectories.R # Plot the trajectories of the experimental and synthetic data (generated in generate_synthetic_data_ctmc)
-│   ├── figure_formatting.R # File for consistent formatting
 │   └── calc_frog_loss_rate.R # Calculate the loss rate of the frogs for each setup
 ├── R
 │   ├── ode_model.R # The ODE model definition (to determine parameters for the synthetic study)
 │   ├── stochastic_model.R # Model and parameter definition for the CTMC model
 │   ├── seq_abc_summ_stats.R # Definition of summary statistic for the ABC estimator
-│   └── gillespie_run_fns.R # Functions to run the CTMC model using the gillespie algorithm
+│   ├── gillespie_run_fns.R # Functions to run the CTMC model using the gillespie algorithm
+│   └── figure_formatting.R # Plot and label formatting
 ├── data
 │   ├── expdata.rda # Project data - experimental data from Waddle et al.
 │   ├── syndata.rda # Project data - synthetic data generated using `generate_synthetic_data_ctmc.R`
@@ -53,13 +56,13 @@ The directory tree below details the files included in this repository and annot
 
 Considerations for running the paper results:
 
-1.  **Data Storage**: All intermediate data generated at each step is stored in the `data` directory, while the resulting figures are saved in the `figures` directory. All intermediate results are stored and require on the order of **15—20 GB of storage** per estimation.
+1.  **Data Storage**: All intermediate data generated at each step is stored in the `data` directory, while the resulting figures are saved in the `figures` directory. All intermediate results are stored and require on the order of **15—20 GB of storage** per estimation. This can be reduced by changing the `verbose = T` flag in `run_seq_abc.R` (line 118), but note this may break the data saving and subsequent plotting code.
 
 2.  **Estimated run times**: The setup described in the paper, on 12 cores (Mac Studio M4 Max), takes between **4 and 7 days**.
 
 3.  **Modifying Parameters**: To adjust priors or algorithm hyperparameters, update the relevant values in the `run_seq_abc.R` file. To adjust other model parameters, update the relevant values in `stochastic_model.R`.
 
-4.  **Command Execution**: All commands are executed from within the root project directory.
+4.  **Script Execution**: All scripts are setup to be executed from within the root project directory.
 
 ### Model run workflow
 *The same workflow is used for both the simulation estimation study and the main estimation results.*
@@ -89,13 +92,13 @@ Considerations for running the paper results:
 
 3.  **Plot prior and posterior distributions, posterior examples, and extract Summary Statistics:**
 
-    i. Choose the appropriate label and directory path at the beginning of both files listed below by commenting/uncommenting as required. 
+    i. Use command line argument 'syn' or 'exp' to switch between the simulation estimation or main estimation data.
     
     ii. Figures are saved to figures directory with prefix `syn_` or `exp_` for simulation estimation and main estimation respectively.
 
     ``` bash
-    Rscript plot_posterior_distributions.R
-    Rscript plot_posterior_examples.R
+    Rscript plot_posterior_distributions.R 'syn'
+    Rscript plot_posterior_examples.R 'syn'
     ```
 
 
